@@ -9,10 +9,11 @@ import (
 )
 
 func main() {
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Llongfile)
 	log.SetOutput(os.Stdout)
 	log.SetPrefix("[gobncs] ")
 
-	ln, _ := net.Listen("tcp", ":6112")
+	ln, _ := net.Listen("tcp", ":6113")
 	defer ln.Close()
 
 	for {
