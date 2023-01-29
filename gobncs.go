@@ -13,7 +13,7 @@ func main() {
 	log.SetOutput(os.Stdout)
 	log.SetPrefix("[gobncs] ")
 
-	ln, _ := net.Listen("tcp", ":6113")
+	ln, _ := net.Listen("tcp", ":6112")
 	defer ln.Close()
 
 	for {

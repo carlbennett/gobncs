@@ -3,8 +3,10 @@ package server
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
 
+	"github.com/carlbennett/gobncs/clientstate"
 	"github.com/carlbennett/gobncs/message"
 	"github.com/carlbennett/gobncs/parser"
 )
@@ -16,30 +18,44 @@ func HandleConnection(conn net.Conn) error {
 	log.Printf("(%s) connection established; waiting for protocol type request\n", remoteAddr)
 	defer log.Printf("(%s) connection terminated\n", remoteAddr)
 
-	protocol, err := message.ReadProtocolByte(conn)
+	state := &clientstate.ClientState{
+		Conn:         conn,
+		Ping:         -1,
+		PingCookie:   rand.Uint32(),
+		Platform:     clientstate.PLATFORM_ZERO,
+		Product:      clientstate.PRODUCT_ZERO,
+		RemoteAddr:   remoteAddr,
+		TimezoneBias: 0,
+	}
+	clientstate.AddClientState(conn, state)
+	defer clientstate.RemoveClientState(conn)
+
+	protocol, err := clientstate.ReadProtocolType(conn)
 	if err != nil {
 		return err
 	}
+	state.ProtocolType = protocol
 
 	switch protocol {
-	case 0x01, 0x02, 0x03, 0x63:
+	case 0x01:
 		log.Printf("(%s) protocol type (0x%02X) requested", remoteAddr, protocol)
 	default:
 		log.Printf("(%s) unknown protocol type (0x%02X) requested; terminating connection", remoteAddr, protocol)
 		return err
 	}
 
+	// begin game protocol message stream
 	for {
 		message, err := message.ReadMessage(conn)
 		if message == nil || err != nil {
 			return err
 		}
-		go HandleMessage(conn, message)
+		go HandleMessage(state, message)
 	}
 }
 
-func HandleMessage(conn net.Conn, messageData *message.Message) {
-	remoteAddr := conn.RemoteAddr()
+func HandleMessage(state *clientstate.ClientState, messageData *message.Message) {
+	remoteAddr := state.RemoteAddr
 	messageId := messageData.ID
 	messageName := message.MessageIdToName(messageId)
 
@@ -48,17 +64,17 @@ func HandleMessage(conn net.Conn, messageData *message.Message) {
 	var err error
 	switch messageId {
 	case message.SID_NULL:
-		err = parser.ParseSID_NULL(conn, messageData)
+		err = parser.ParseSID_NULL(state, messageData)
 	case message.SID_PING:
-		err = parser.ParseSID_PING(conn, messageData)
+		err = parser.ParseSID_PING(state, messageData)
 	case message.SID_AUTH_INFO:
-		err = parser.ParseSID_AUTH_INFO(conn, messageData)
+		err = parser.ParseSID_AUTH_INFO(state, messageData)
 	default:
 		err = fmt.Errorf("unknown message id (0x%02X); terminating connection", messageId)
 	}
 
 	if err != nil {
 		log.Printf("(%s) error parsing message ([0x%02X] %s): %s", remoteAddr, messageId, messageName, err)
-		conn.Close()
+		state.Conn.Close()
 	}
 }

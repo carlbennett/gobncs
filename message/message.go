@@ -263,12 +263,3 @@ func ReadMessage(conn io.Reader) (*Message, error) {
 		Body:   body,
 	}, nil
 }
-
-func ReadProtocolByte(conn io.Reader) (byte, error) {
-	var buf [1]byte
-	_, err := io.ReadFull(conn, buf[:])
-	if err != nil {
-		return 0, err
-	}
-	return buf[0], nil
-}
