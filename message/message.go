@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"net"
 )
 
 type MessageId byte
@@ -238,10 +237,6 @@ func MessageIdToName(id MessageId) string {
 		return name
 	}
 	return fmt.Sprintf("SID_UNKNOWN_%02X", id)
-}
-
-func ParseMessage(conn net.Conn, messageData *Message) {
-
 }
 
 func ReadMessage(conn io.Reader) (*Message, error) {

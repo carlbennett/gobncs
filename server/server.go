@@ -1,18 +1,20 @@
 package server
 
 import (
+	"fmt"
 	"log"
 	"net"
 
 	"github.com/carlbennett/gobncs/message"
+	"github.com/carlbennett/gobncs/parser"
 )
 
 func HandleConnection(conn net.Conn) error {
 	defer conn.Close()
 
 	remoteAddr := conn.RemoteAddr()
-	log.Printf("(%s) Connection established; waiting for protocol type request\n", remoteAddr)
-	defer log.Printf("(%s) Connection terminated\n", remoteAddr)
+	log.Printf("(%s) connection established; waiting for protocol type request\n", remoteAddr)
+	defer log.Printf("(%s) connection terminated\n", remoteAddr)
 
 	protocol, err := message.ReadProtocolByte(conn)
 	if err != nil {
@@ -21,9 +23,9 @@ func HandleConnection(conn net.Conn) error {
 
 	switch protocol {
 	case 0x01, 0x02, 0x03, 0x63:
-		log.Printf("(%s) Protocol type (0x%02X) requested", remoteAddr, protocol)
+		log.Printf("(%s) protocol type (0x%02X) requested", remoteAddr, protocol)
 	default:
-		log.Printf("(%s) Unknown protocol type (0x%02X) requested; terminating connection", remoteAddr, protocol)
+		log.Printf("(%s) unknown protocol type (0x%02X) requested; terminating connection", remoteAddr, protocol)
 		return err
 	}
 
@@ -36,23 +38,27 @@ func HandleConnection(conn net.Conn) error {
 	}
 }
 
-// refactor this file for me please 
-
 func HandleMessage(conn net.Conn, messageData *message.Message) {
 	remoteAddr := conn.RemoteAddr()
 	messageId := messageData.ID
+	messageName := message.MessageIdToName(messageId)
 
-	log.Printf("(%s) Message id (0x%02X: %s) received from client; parsing", remoteAddr, messageId, message.MessageIdToName(messageId))
+	log.Printf("(%s) message ([0x%02X] %s) received from client; parsing", remoteAddr, messageId, messageName)
 
+	var err error
 	switch messageId {
 	case message.SID_NULL:
-		message.ParseMessage(conn, messageData)
+		err = parser.ParseSID_NULL(conn, messageData)
 	case message.SID_PING:
-		message.ParseMessage(conn, messageData)
+		err = parser.ParseSID_PING(conn, messageData)
 	case message.SID_AUTH_INFO:
-		message.ParseMessage(conn, messageData)
+		err = parser.ParseSID_AUTH_INFO(conn, messageData)
 	default:
-		log.Printf("(%s) Unknown message id (0x%02X); terminating connection", remoteAddr, messageId)
+		err = fmt.Errorf("unknown message id (0x%02X); terminating connection", messageId)
+	}
+
+	if err != nil {
+		log.Printf("(%s) error parsing message ([0x%02X] %s): %s", remoteAddr, messageId, messageName, err)
 		conn.Close()
 	}
 }
